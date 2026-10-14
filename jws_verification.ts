@@ -4,6 +4,11 @@ import jsonwebtoken = require('jsonwebtoken');
 
 import base64url from 'base64url';
 import { KeyObject, X509Certificate, createHash, verify } from 'crypto';
+import { AsnParser, AsnSerializer, OctetString } from '@peculiar/asn1-schema';
+import { AlgorithmIdentifier, ExtendedKeyUsage, KeyUsage, KeyUsageFlags, id_ce_extKeyUsage, id_ce_keyUsage, id_kp_OCSPSigning } from '@peculiar/asn1-x509';
+import { BasicOCSPResponse, CertID, OCSPRequest, OCSPResponse, OCSPResponseStatus, Request, TBSRequest, id_pkix_ocsp_basic } from '@peculiar/asn1-ocsp';
+import { BitString } from 'asn1js';
+import { asn1Children, certificateExtensions, parseASN1, parseCertificate } from './asn1_utils';
 import * as nodeFetch from 'node-fetch';
 import { Environment } from './models/Environment';
 import { JWSTransactionDecodedPayload, JWSTransactionDecodedPayloadValidator } from './models/JWSTransactionDecodedPayload';
@@ -285,8 +290,6 @@ export class SignedDataVerifier {
     }
 
     protected async verifyCertificateChainWithoutCaching(trustedRoots: X509Certificate[], leaf: X509Certificate, intermediate: X509Certificate, effectiveDate: Date): Promise<KeyObject> {
-      // Load ASN.1 schemas only when certificate verification is needed.
-      const { parseASN1, certificateExtensions } = await import('./asn1_utils')
       let validity = false
       let rootCert
       for (const root of trustedRoots) {
@@ -319,11 +322,6 @@ export class SignedDataVerifier {
       return leaf.publicKey
     }
     protected async checkOCSPStatus(cert: X509Certificate, issuer: X509Certificate): Promise<void> {
-      const { AsnParser, AsnSerializer, OctetString } = await import('@peculiar/asn1-schema')
-      const { AlgorithmIdentifier, ExtendedKeyUsage, KeyUsage, KeyUsageFlags, id_ce_extKeyUsage, id_ce_keyUsage, id_kp_OCSPSigning } = await import('@peculiar/asn1-x509')
-      const { BasicOCSPResponse, CertID, OCSPRequest, OCSPResponse, OCSPResponseStatus, Request, TBSRequest, id_pkix_ocsp_basic } = await import('@peculiar/asn1-ocsp')
-      const { asn1Children, parseASN1, parseCertificate } = await import('./asn1_utils')
-      const { BitString } = await import('asn1js')
       const authorityRex = /^OCSP - URI:(.*)$/m
       const matchResult = cert.infoAccess ? authorityRex.exec(cert.infoAccess) : ""
       if (matchResult === null || matchResult.length !== 2) {
